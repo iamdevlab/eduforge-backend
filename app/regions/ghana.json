@@ -1,0 +1,109 @@
+{
+  "region": "Ghana",
+  "curriculum": "Standard-Based Curriculum (SBC) / WAEC",
+  "levels": {
+    "primary": {
+      "grades": ["Basic 1", "Basic 2", "Basic 3", "Basic 4", "Basic 5", "Basic 6"],
+      "subjects": [
+        "Mathematics",
+        "English Language",
+        "Science",
+        "Social Studies",
+        "Creative Arts",
+        "Physical Education",
+        "History",
+        "Our World Our People",
+        "Computing",
+        "Religious and Moral Education"
+      ],
+      "exam_style": {
+        "objective": true,
+        "essay": true,
+        "practical": false
+      },
+      "syllabus_anchors": {
+        "Mathematics": ["Addition", "Subtraction", "Fractions", "Geometry"],
+        "English Language": ["Grammar", "Comprehension", "Composition"],
+        "Science": ["Plants", "Animals", "Matter", "Energy"]
+      }
+    },
+    "junior_secondary": {
+      "grades": ["JHS1", "JHS2", "JHS3"],
+      "subjects": [
+        "Mathematics",
+        "English Language",
+        "Integrated Science",
+        "Social Studies",
+        "ICT",
+        "Career Technology",
+        "Religious and Moral Education",
+        "Ghanaian Language",
+        "French"
+      ],
+      "exam_style": {
+        "objective": true,
+        "essay": true,
+        "practical": false
+      },
+      "external_alignment": ["BECE"],
+      "syllabus_anchors": {
+        "Integrated Science": ["Cells", "Matter", "Energy", "Environment"],
+        "Mathematics": ["Algebra", "Statistics", "Mensuration", "Geometry"],
+        "English Language": ["Summary Writing", "Comprehension", "Letter Writing"]
+      }
+    },
+    "senior_secondary": {
+      "grades": ["SHS1", "SHS2", "SHS3"],
+      "streams": {
+        "science": ["Mathematics", "English Language", "Biology", "Chemistry", "Physics", "Elective Mathematics"],
+        "arts": ["Literature in English", "Government", "History", "Geography", "Economics", "Religious Studies"],
+        "business": ["Business Management", "Accounting", "Economics", "Costing", "Mathematics"],
+        "technical_vocational": ["Technical Drawing", "Woodwork", "Metalwork", "Applied Electricity", "Visual Arts"]
+      },
+      "exam_style": {
+        "objective": true,
+        "essay": true,
+        "practical": true
+      },
+      "external_alignment": ["WASSCE (WAEC)"],
+      "syllabus_anchors": {
+        "Biology": ["Cell structure", "Photosynthesis", "Respiration", "Ecology"],
+        "Chemistry": ["Periodic Table", "Acids & Bases", "Chemical Reactions"],
+        "Physics": ["Motion", "Electricity", "Waves", "Heat Energy"],
+        "Economics": ["Demand & Supply", "Inflation", "National Income"]
+      }
+    }
+  },
+  "difficulty_levels": {
+    "easy": "Recall of facts, simple definitions",
+    "medium": "Application, reasoning, short structured answers",
+    "hard": "Critical analysis, extended responses, practical scenarios"
+  },
+  "command_words": {
+    "easy": ["state", "list", "mention", "define"],
+    "medium": ["outline", "explain", "differentiate", "describe"],
+    "hard": ["discuss", "analyze", "evaluate", "justify"]
+  },
+  "marking_scheme": {
+    "objective": "1 mark per question",
+    "essay": "10-20 marks depending on question depth",
+    "practical": "Up to 30 marks (procedure, accuracy, reporting)"
+  },
+  "assessment_ratio": {
+    "BECE": {"objective": 60, "essay": 40},
+    "WASSCE": {"objective": 50, "essay": 50}
+  },
+  "practical_subjects": [
+    "Biology",
+    "Chemistry",
+    "Physics",
+    "Technical Drawing",
+    "Woodwork",
+    "Metalwork",
+    "Applied Electricity",
+    "Visual Arts"
+  ],
+  "objective_label_modes": ["A. B. C.", "a. b. c.", "A) B) C)", "a) b) c)"],
+  "essay_modes": ["single", "nested"],
+  "time_format": ["minutes", "hours"]
+}

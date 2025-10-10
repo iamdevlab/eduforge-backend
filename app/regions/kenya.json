@@ -1,0 +1,138 @@
+{
+  "region": "Kenya",
+  "curriculum": "Competency-Based Curriculum (CBC) / Legacy 8-4-4",
+  "levels": {
+    "primary_cbc": {
+      "grades": ["Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6"],
+      "subjects": [
+        "Mathematics",
+        "English",
+        "Kiswahili",
+        "Kenya Sign Language (where applicable)",
+        "Environmental Activities",
+        "Social Studies",
+        "Science and Technology",
+        "Agriculture",
+        "Religious Education (CRE/IRE/HRE)",
+        "Art and Craft",
+        "Music",
+        "Physical and Health Education"
+      ],
+      "exam_style": {
+        "objective": true,
+        "essay": true,
+        "practical": true,
+        "project_based": true
+      },
+      "syllabus_anchors": {
+        "Mathematics": ["Number Operations", "Geometry", "Measurement", "Data Handling"],
+        "Science and Technology": ["Living Things", "Energy", "Earth & Environment", "Simple Machines"],
+        "Social Studies": ["Kenyan Communities", "Environment", "Civic Responsibility"]
+      }
+    },
+    "junior_secondary_cbc": {
+      "grades": ["Grade 7", "Grade 8", "Grade 9"],
+      "subjects": [
+        "Mathematics",
+        "English",
+        "Kiswahili",
+        "Kenya Sign Language (where applicable)",
+        "Integrated Science",
+        "Social Studies",
+        "Pre-Technical Studies",
+        "Business Studies",
+        "Agriculture",
+        "Visual Arts",
+        "Performing Arts",
+        "Life Skills",
+        "Sports Science",
+        "Religious Education"
+      ],
+      "exam_style": {
+        "objective": true,
+        "essay": true,
+        "practical": true,
+        "project_based": true
+      },
+      "syllabus_anchors": {
+        "Integrated Science": ["Cells", "Energy", "Matter", "Environment & Conservation"],
+        "Pre-Technical Studies": ["Design Basics", "Tools & Materials", "Simple Engineering"],
+        "Business Studies": ["Trade", "Entrepreneurship", "Basic Accounting"]
+      }
+    },
+    "senior_secondary_cbc": {
+      "grades": ["Grade 10", "Grade 11", "Grade 12"],
+      "pathways": {
+        "arts_and_sports_science": ["Visual Arts", "Performing Arts", "Sports Science", "Literature", "History"],
+        "social_sciences": ["Geography", "Religious Education", "Sociology", "Psychology"],
+        "stem": ["Mathematics", "Biology", "Chemistry", "Physics", "Computer Science", "Engineering Studies"]
+      },
+      "exam_style": {
+        "objective": true,
+        "essay": true,
+        "practical": true,
+        "project_based": true
+      },
+      "external_alignment": ["National Assessment by KNEC"],
+      "syllabus_anchors": {
+        "STEM": ["Advanced Algebra", "Genetics", "Chemical Bonding", "Electricity & Magnetism"],
+        "Arts": ["Drama & Theatre", "Music Performance", "Creative Writing"],
+        "Social Sciences": ["Human Geography", "Ethics", "Contemporary Issues"]
+      }
+    },
+    "legacy_8_4_4": {
+      "primary": {
+        "grades": [
+          "Standard 1",
+          "Standard 2",
+          "Standard 3",
+          "Standard 4",
+          "Standard 5",
+          "Standard 6",
+          "Standard 7",
+          "Standard 8"
+        ],
+        "external_alignment": ["KCPE"]
+      },
+      "secondary": {
+        "grades": ["Form 1", "Form 2", "Form 3", "Form 4"],
+        "external_alignment": ["KCSE"]
+      }
+    }
+  },
+  "difficulty_levels": {
+    "easy": "Recall of facts, definitions, simple problem solving",
+    "medium": "Application, structured responses, analysis",
+    "hard": "Critical reasoning, extended essay, research-oriented tasks"
+  },
+  "command_words": {
+    "easy": ["state", "list", "define", "identify"],
+    "medium": ["explain", "outline", "compare", "differentiate"],
+    "hard": ["analyze", "discuss", "evaluate", "justify", "assess"]
+  },
+  "marking_scheme": {
+    "objective": "1 mark per correct answer",
+    "essay": "Structured marking, typically 10–20 marks",
+    "practical": "Execution, accuracy, and reporting (up to 30 marks)",
+    "project_based": "Creativity, process, and outcome (20–40 marks)"
+  },
+  "assessment_ratio": {
+    "primary_cbc": {"continuous_assessment": 60, "summative": 40},
+    "junior_secondary_cbc": {"continuous_assessment": 50, "summative": 50},
+    "senior_secondary_cbc": {"continuous_assessment": 40, "summative": 60},
+    "legacy_8_4_4": {"continuous_assessment": 20, "summative": 80}
+  },
+  "practical_subjects": [
+    "Science and Technology",
+    "Integrated Science",
+    "Agriculture",
+    "Visual Arts",
+    "Performing Arts",
+    "Sports Science",
+    "Engineering Studies",
+    "Computer Science"
+  ],
+  "objective_label_modes": ["A. B. C.", "a. b. c.", "A) B) C)", "a) b) c)"],
+  "essay_modes": ["single", "nested"],
+  "time_format": ["minutes", "hours"]
+}

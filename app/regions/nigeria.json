@@ -1,0 +1,112 @@
+{
+  "region": "Nigeria",
+  "curriculum": "NERDC",
+  "levels": {
+    "primary": {
+      "grades": [
+        "Basic 1 (Pry 1)",
+        "Basic 2 (Pry 2)",
+        "Basic 3 (Pry 3)",
+        "Basic 4 (Pry 4)",
+        "Basic 5 (Pry 5)",
+        "Basic 6 (Pry 6)"
+      ],
+      "subjects": [
+        "Mathematics",
+        "English Language",
+        "Basic Science",
+        "Social Studies",
+        "Physical and Health Education",
+        "Christian Religious Studies",
+        "Home Economics",
+        "Agricultural Science",
+        "Cultural and Creative Art",
+        "Verbal Reasoning",
+        "Quantitative Reasoning",
+        "Civic Education",
+        "Handwriting",
+        "Computer Studies"
+      ]
+    },
+    "junior_secondary": {
+      "grades": [
+        "Basic 7 (JSS 1)",
+        "Basic 8 (JSS 2)",
+        "Basic 9 (JSS 3)"
+      ],
+      "subjects": [
+        "Mathematics",
+        "English Language",
+        "Civic Education",
+        "Social Studies",
+        "Basic Science",
+        "Basic Technology",
+        "Computer Studies",
+        "Christian Religious Studies",
+        "Business Studies",
+        "Agricultural Science",
+        "Home Economics",
+        "Physical and Health Education",
+        "Cultural and Creative Art",
+        "History"
+      ]
+    },
+    "senior_secondary": {
+      "grades": [
+        "SS1",
+        "SS2",
+        "SS3"
+      ],
+      "subjects": [
+        "Accounting",
+        "Agricultural Science",
+        "Biology",
+        "Chemistry",
+        "Christian Religious Studies",
+        "Civic Education",
+        "Commerce",
+        "Computer Studies/ICT",
+        "Data Processing",
+        "Economics",
+        "English Language",
+        "Entrepreneurship",
+        "Fine Arts/Visual Arts",
+        "French",
+        "Further Mathematics",
+        "General Mathematics",
+        "Government",
+        "History",
+        "Literature-in-English",
+        "Physics",
+        "Technical Drawing",
+        "Music",
+        "Yoruba",
+        "Igbo",
+        "Hausa"
+      ]
+    }
+  },
+  "difficulty_levels": {
+    "easy": "Direct recall, definitions, basic calculations",
+    "medium": "Application, problem solving, short structured answers",
+    "hard": "Critical thinking, analysis, extended essay"
+  },
+  "command_words": {
+    "easy": ["define", "list", "state", "mention"],
+    "medium": ["explain", "differentiate", "outline", "describe"],
+    "hard": ["discuss", "analyze", "evaluate", "justify", "compare"]
+  },
+  "marking_scheme": {
+    "objective": "1 mark per question",
+    "essay": "10-15 marks depending on depth",
+    "practical": "Up to 25 marks, includes observation, procedure, and reporting"
+  },
+  "assessment_ratio": {
+    "objective": 50,
+    "essay": 50
+  },
+  "practical_subjects": ["Biology", "Chemistry", "Physics", "Agricultural Science"],
+  "objective_label_modes": ["A. B. C.", "a. b. c.", "A) B) C)", "a) b) c)"],
+  "essay_modes": ["single", "nested"],
+  "time_format": ["minutes", "hours"]
+}

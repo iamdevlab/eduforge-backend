@@ -1,0 +1,139 @@
+{
+  "region": "South Africa",
+  "curriculum": "CAPS (Curriculum and Assessment Policy Statement)",
+  "levels": {
+    "foundation_phase": {
+      "grades": ["Grade R", "Grade 1", "Grade 2", "Grade 3"],
+      "subjects": [
+        "Home Language",
+        "First Additional Language",
+        "Mathematics",
+        "Life Skills"
+      ],
+      "exam_style": {
+        "objective": true,
+        "essay": false,
+        "practical": true
+      },
+      "syllabus_anchors": {
+        "Mathematics": ["Number Recognition", "Counting", "Shapes", "Patterns"],
+        "Home Language": ["Phonics", "Reading Comprehension", "Basic Writing"],
+        "Life Skills": ["Personal Development", "Creative Arts", "Physical Education"]
+      }
+    },
+    "intermediate_phase": {
+      "grades": ["Grade 4", "Grade 5", "Grade 6"],
+      "subjects": [
+        "Home Language",
+        "First Additional Language",
+        "Mathematics",
+        "Natural Sciences and Technology",
+        "Social Sciences",
+        "Life Skills"
+      ],
+      "exam_style": {
+        "objective": true,
+        "essay": true,
+        "practical": true
+      },
+      "syllabus_anchors": {
+        "Natural Sciences and Technology": ["Energy & Change", "Life & Living", "Earth & Beyond", "Matter & Materials"],
+        "Mathematics": ["Fractions", "Decimals", "Measurement", "Geometry"],
+        "Social Sciences": ["History of South Africa", "Geography Basics", "Maps & Climate"]
+      }
+    },
+    "senior_phase": {
+      "grades": ["Grade 7", "Grade 8", "Grade 9"],
+      "subjects": [
+        "Home Language",
+        "First Additional Language",
+        "Mathematics",
+        "Natural Sciences",
+        "Social Sciences",
+        "Technology",
+        "Economic and Management Sciences",
+        "Creative Arts",
+        "Life Orientation"
+      ],
+      "exam_style": {
+        "objective": true,
+        "essay": true,
+        "practical": true
+      },
+      "syllabus_anchors": {
+        "Natural Sciences": ["Cells & Systems", "Matter & Materials", "Energy Systems", "Ecosystems"],
+        "Technology": ["Design Process", "Mechanical Systems", "Electrical Systems"],
+        "EMS": ["Entrepreneurship", "Financial Literacy", "Economic Cycle"]
+      }
+    },
+    "further_education_and_training": {
+      "grades": ["Grade 10", "Grade 11", "Grade 12"],
+      "compulsory_subjects": [
+        "Home Language",
+        "First Additional Language",
+        "Mathematics OR Mathematical Literacy",
+        "Life Orientation"
+      ],
+      "electives": [
+        "Physical Sciences",
+        "Life Sciences",
+        "Geography",
+        "History",
+        "Accounting",
+        "Business Studies",
+        "Economics",
+        "Information Technology",
+        "Engineering Graphics and Design",
+        "Tourism",
+        "Visual Arts",
+        "Dramatic Arts"
+      ],
+      "exam_style": {
+        "objective": true,
+        "essay": true,
+        "practical": true
+      },
+      "external_alignment": ["NSC (National Senior Certificate)"],
+      "syllabus_anchors": {
+        "Physical Sciences": ["Mechanics", "Electricity & Magnetism", "Waves & Sound", "Chemical Reactions"],
+        "Life Sciences": ["Cell Biology", "Genetics", "Evolution", "Human Physiology"],
+        "Mathematics": ["Algebra", "Trigonometry", "Calculus", "Probability"],
+        "Business Studies": ["Business Environments", "Management & Leadership", "Business Operations"]
+      }
+    }
+  },
+  "difficulty_levels": {
+    "easy": "Basic recall, simple comprehension",
+    "medium": "Application of knowledge, reasoning, short structured answers",
+    "hard": "Critical thinking, extended essays, investigations, projects"
+  },
+  "command_words": {
+    "easy": ["list", "name", "state", "identify"],
+    "medium": ["explain", "outline", "compare", "describe"],
+    "hard": ["analyze", "evaluate", "assess", "justify", "discuss"]
+  },
+  "marking_scheme": {
+    "objective": "1 mark per correct response",
+    "essay": "10–20 marks depending on depth",
+    "practical": "Procedural accuracy, execution, and reporting (up to 30 marks)"
+  },
+  "assessment_ratio": {
+    "foundation_phase": {"objective": 40, "practical": 60},
+    "intermediate_phase": {"objective": 50, "essay": 30, "practical": 20},
+    "senior_phase": {"objective": 40, "essay": 40, "practical": 20},
+    "NSC": {"objective": 40, "essay": 40, "practical": 20}
+  },
+  "practical_subjects": [
+    "Natural Sciences",
+    "Physical Sciences",
+    "Life Sciences",
+    "Technology",
+    "Information Technology",
+    "Engineering Graphics and Design",
+    "Visual Arts",
+    "Dramatic Arts"
+  ],
+  "objective_label_modes": ["A. B. C.", "a. b. c.", "A) B) C)", "a) b) c)"],
+  "essay_modes": ["single", "nested"],
+  "time_format": ["minutes", "hours"]
+}
