@@ -15,42 +15,29 @@ class AIClientError(Exception):
     pass
 
 
-async def _fetch_openai_like(
-    prompt: str,
-    api_url: str,
-    api_key: str,
-    model: str = "gpt-4o-mini",
-    timeout: int = 30,
-) -> str:
-    """
-    Minimal wrapper for calling an OpenAI-like completion endpoint.
-    Replace this with your provider's request shape.
-    """
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {
-        "model": model,
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 800,
-        "temperature": 0.2,
-    }
+async def _fetch_openai_like(prompt: str, api_url: str, api_key: str, model: str) -> str: # FIXED: Return type is now str
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        # Detect provider based on URL
+        if "generativelanguage.googleapis.com" in api_url:
+            url = f"{api_url}?key={api_key}"
+            payload = {"contents": [{"parts": [{"text": prompt}]}]}
+            resp = await client.post(url, json=payload)
+        else:
+            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+            payload = {"model": model, "messages": [{"role": "user", "content": prompt}]}
+            resp = await client.post(api_url, headers=headers, json=payload)
 
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        resp = await client.post(api_url, headers=headers, json=payload)
-        if resp.status_code >= 400:
-            logger.error("AI provider error %s: %s", resp.status_code, resp.text)
+        if resp.status_code != 200:
             raise AIClientError(f"AI provider returned status {resp.status_code}: {resp.text}")
-        body = resp.json()
-        # adapt to the provider response structure:
-        # for OpenAI: body["choices"][0]["message"]["content"]
-        try:
-            content = body["choices"][0]["message"]["content"]
-        except Exception:
-            # fallback: try a common shape
-            if "data" in body and isinstance(body["data"], list):
-                content = body["data"][0].get("text") or json.dumps(body)
-            else:
-                content = json.dumps(body)
-        return content
+
+        data = resp.json()
+
+        # Normalize output for both providers
+        if "generativelanguage.googleapis.com" in api_url:
+            # FIXED: Return the raw text directly, do not try to parse or wrap it.
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        else:
+            return data["choices"][0]["message"]["content"]
 
 
 def _extract_json_from_text(text: str) -> Optional[Dict[str, Any]]:
@@ -59,18 +46,23 @@ def _extract_json_from_text(text: str) -> Optional[Dict[str, Any]]:
     First, attempt to parse the whole string. If that fails, locate the first {...} block.
     """
     text = text.strip()
+    # Handle markdown code blocks
+    if text.startswith("```json"):
+        text = text[7:-3].strip()
+    elif text.startswith("```"):
+        text = text[3:-3].strip()
+        
     try:
         return json.loads(text)
-    except Exception:
-        # find JSON object with regex (greedy braces)
-        # This simple heuristic finds the first balanced-ish braces group.
-        # For robust usage, consider a streaming JSON parser.
-        matches = re.findall(r"(\{(?:[^{}]|(?R))*\})", text)
-        for m in matches:
+    except json.JSONDecodeError:
+        # Fallback to regex for more complex cases if needed, but the above is often sufficient.
+        matches = re.search(r"\{.*\}", text, re.DOTALL)
+        if matches:
             try:
-                return json.loads(m)
-            except Exception:
-                continue
+                return json.loads(matches.group(0))
+            except json.JSONDecodeError:
+                pass # Failed to parse the extracted block
+    logger.warning("Failed to extract any valid JSON from the AI response.")
     return None
 
 
@@ -86,33 +78,29 @@ async def call_ai_model(
 ) -> Any:
     """
     Call the AI provider and return a validated object (if schema_parser provided).
-    - prompt: the prompt string.
-    - api_url: provider endpoint.
-    - api_key: provider key.
-    - schema_parser: callable to parse/validate the returned dict (e.g., LessonWeek.parse_obj).
-    Returns parsed object (if schema_parser) or raw dict.
-    Raises AIClientError on unrecoverable failure.
     """
+
     last_exc = None
-    for attempt in range(1, max_retries + 2):  # attempts = max_retries + 1
+    for attempt in range(1, max_retries + 2):
         try:
             logger.info("AI call attempt %d", attempt)
+            # FIXED: Now receives raw text as a string
             raw_text = await _fetch_openai_like(prompt, api_url, api_key, model=model)
-            logger.debug("AI raw response: %s", raw_text[:1000])
 
+            logger.debug("AI raw response (truncated): %s", raw_text[:1000])
+
+            # FIXED: This logic now correctly executes and extracts the JSON
             parsed = _extract_json_from_text(raw_text)
+            
             if parsed is None:
-                raise AIClientError("AI response did not contain valid JSON")
+                # If extraction fails, it's a critical error that should trigger a retry.
+                raise AIClientError("Failed to extract valid JSON from the AI's response text.")
 
-            # Optional schema validation/parsing
             if schema_parser:
                 try:
-                    obj = schema_parser(parsed)
-                    return obj
+                    return schema_parser(parsed)
                 except Exception as e:
                     logger.warning("Schema parser rejected AI output: %s", e)
-                    # If parser fails, try to return raw dict for debugging, but continue retrying.
-                    last_exc = e
                     raise AIClientError(f"Schema validation failed: {e}")
 
             return parsed
@@ -123,7 +111,6 @@ async def call_ai_model(
             if attempt <= max_retries:
                 sleep_time = backoff_base * (2 ** (attempt - 1))
                 await asyncio.sleep(sleep_time)
-                continue
             else:
                 break
 
