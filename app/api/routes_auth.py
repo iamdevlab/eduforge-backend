@@ -1,99 +1,222 @@
+# app/routes/routes_auth.py
+
 """
 routes_auth.py
 ---------------
 Authentication routes for EduForge.
 
-Features:
-- Login endpoint (validates username & password).
-- Issues JWT access tokens upon successful authentication.
-- Uses Argon2 password hashing from security.py.
-- Currently uses an in-memory "fake_users" dictionary
-  (replace with real DB integration later).
+Handles user registration and login by connecting
+to the real database.
 """
 
 from fastapi import APIRouter, HTTPException, Depends, status
-from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from sqlalchemy import or_  # Import 'or_' for flexible queries
+
 from app.core import security
+from app.services.database import get_db
+import app.schema.users as schemas  # Import your Pydantic schemas
+import app.models.users as models  # Import your SQLAlchemy model
+
+# --- 1. IMPORT THE NEW MODEL ---
+from app.subscription_model import UsageLimits
+
 
 # Create a router instance
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 # ------------------------------------------------
-# Fake user "database" (for testing/demo purposes)
-# ------------------------------------------------
-# TODO: Replace with a real database (e.g. PostgreSQL + SQLAlchemy models)
-fake_users = {
-    "admin": security.get_password_hash("admin"),         # password: "admin"
-    "precious": security.get_password_hash("admin"),      # password: "admin"
-    "teacher": security.get_password_hash("password123"), # password: "password123"
-}
-
-# ------------------------------------------------
-# Request Models
-# ------------------------------------------------
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-# ------------------------------------------------
 # Routes
 # ------------------------------------------------
-@router.post("/login")
-def login(request: LoginRequest):
+
+
+@router.post("/register", response_model=schemas.User)
+def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    """
+    Register a new user in the database.
+    """
+    # Check if user with this username or email already exists
+    db_user = (
+        db.query(models.User)
+        .filter(
+            or_(models.User.username == user.username, models.User.email == user.email)
+        )
+        .first()
+    )
+
+    if db_user:
+        if db_user.username == user.username:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username already registered",
+            )
+        if db_user.email == user.email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered",
+            )
+
+    # Hash the password
+    hashed_password = security.get_password_hash(user.password)
+
+    # --- 2. UPDATE USER CREATION LOGIC ---
+
+    # Create new User model instance
+    new_user = models.User(
+        username=user.username, email=user.email, hashed_password=hashed_password
+    )
+
+    # Create their associated usage limits
+    new_usage = UsageLimits()
+
+    # Link them together via the relationship
+    # This tells SQLAlchemy to create both
+    new_user.usage = new_usage
+
+    # Add to session, commit, and refresh
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    # -------------------------------------
+
+    return new_user
+
+
+@router.post("/token", response_model=schemas.Token)
+def login_for_access_token(
+    request: schemas.LoginRequest, db: Session = Depends(get_db)
+):
     """
     Authenticate user and return a JWT token.
+    Matches the '/auth/token' endpoint called by the frontend.
 
-    Args:
-        request (LoginRequest): Username & password payload.
-
-    Returns:
-        dict: {"access_token": <JWT>, "token_type": "bearer"}
-
-    Raises:
-        HTTPException: If credentials are invalid.
+    Accepts either a username or an email as the 'username' field.
     """
-    # Fetch hashed password for this user (None if user does not exist)
-    user_pw = fake_users.get(request.username)
+    # Find user by EITHER username or email
+    user = (
+        db.query(models.User)
+        .filter(
+            or_(
+                models.User.username == request.username,
+                models.User.email == request.username,
+            )
+        )
+        .first()
+    )
 
     # Check if user exists AND password matches
-    if not user_pw or not security.verify_password(request.password, user_pw):
+    if not user or not security.verify_password(request.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password",
+            detail="Invalid username or password",  # Use a generic message for security
             headers={"WWW-Authenticate": "Bearer"},
         )
 
     # Generate JWT token with username as "sub"
-    token = security.create_access_token(data={"sub": request.username})
+    token = security.create_access_token(data={"sub": user.username})
 
     return {"access_token": token, "token_type": "bearer"}
 
 
-# from fastapi import APIRouter, HTTPException, Depends
-# from pydantic import BaseModel
+# """
+# routes_auth.py
+# ---------------
+# Authentication routes for EduForge.
+
+# Handles user registration and login by connecting
+# to the real database.
+# """
+
+# from fastapi import APIRouter, HTTPException, Depends, status
+# from sqlalchemy.orm import Session
+# from sqlalchemy import or_  # Import 'or_' for flexible queries
+
 # from app.core import security
+# from app.services.database import get_db
+# import app.schema.users as schemas  # Import your Pydantic schemas
+# import app.models.users as models  # Import your SQLAlchemy model
 
-# router = APIRouter()
+# # Create a router instance
+# router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-# # TODO: Replace with real DB
-# fake_users = {
-#     "admin": security.get_password_hash("admin"),
-#     "precious": security.get_password_hash("admin"),
-#     "teacher": security.get_password_hash("password123"),
-# }
-
-
-
-# class LoginRequest(BaseModel):
-#     username: str
-#     password: str
+# # ------------------------------------------------
+# # Routes
+# # ------------------------------------------------
 
 
-# @router.post("/login")
-# def login(request: LoginRequest):
-#     user_pw = fake_users.get(request.username)
-#     if not user_pw or not security.verify_password(request.password, user_pw):
-#         raise HTTPException(status_code=401, detail="Invalid credentials")
+# @router.post("/register", response_model=schemas.User)
+# def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
+#     """
+#     Register a new user in the database.
+#     """
+#     # Check if user with this username or email already exists
+#     db_user = (
+#         db.query(models.User)
+#         .filter(
+#             or_(models.User.username == user.username, models.User.email == user.email)
+#         )
+#         .first()
+#     )
 
-#     token = security.create_access_token(data={"sub": request.username})
+#     if db_user:
+#         if db_user.username == user.username:
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail="Username already registered",
+#             )
+#         if db_user.email == user.email:
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail="Email already registered",
+#             )
+
+#     # Hash the password
+#     hashed_password = security.get_password_hash(user.password)
+
+#     # Create new User model instance
+#     new_user = models.User(
+#         username=user.username, email=user.email, hashed_password=hashed_password
+#     )
+
+#     # Add to session, commit, and refresh
+#     db.add(new_user)
+#     db.commit()
+#     db.refresh(new_user)
+
+#     return new_user
+
+
+# @router.post("/token", response_model=schemas.Token)
+# def login_for_access_token(
+#     request: schemas.LoginRequest, db: Session = Depends(get_db)
+# ):
+#     """
+#     Authenticate user and return a JWT token.
+#     Matches the '/auth/token' endpoint called by the frontend.
+
+#     Accepts either a username or an email as the 'username' field.
+#     """
+#     # Find user by EITHER username or email
+#     user = (
+#         db.query(models.User)
+#         .filter(
+#             or_(
+#                 models.User.username == request.username,
+#                 models.User.email == request.username,
+#             )
+#         )
+#         .first()
+#     )
+
+#     # Check if user exists AND password matches
+#     if not user or not security.verify_password(request.password, user.hashed_password):
+#         raise HTTPException(
+#             status_code=status.HTTP_401_UNAUTHORIZED,
+#             detail="Invalid username or password",  # Use a generic message for security
+#             headers={"WWW-Authenticate": "Bearer"},
+#         )
+
+#     # Generate JWT token with username as "sub"
+#     token = security.create_access_token(data={"sub": user.username})
+
 #     return {"access_token": token, "token_type": "bearer"}

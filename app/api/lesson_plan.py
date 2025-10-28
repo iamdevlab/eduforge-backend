@@ -1,10 +1,19 @@
+# app/api/lesson_plan.py
+
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List
 import logging
 from app.services.ai_lesson_plan_generator import generate_lesson_plan
 from app.models.lesson_plan_model import LessonPlan, LessonPlanRequest
-from app.core.security import get_current_user
+
+# --- 1. IMPORTS TO ADD/CHANGE ---
+from sqlalchemy.orm import Session
+from app.models.users import User
+from app.subscription_model import SubscriptionTier
+from app.services.database import get_db
+from app.core.dependencies import get_current_db_user, check_lesson_plan_limit
+# ------------------------------
 
 router = APIRouter()
 
@@ -15,7 +24,9 @@ logger = logging.getLogger("lesson_plan_api")
 logger.setLevel(logging.INFO)
 if not logger.handlers:
     handler = logging.StreamHandler()
-    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(name)s - %(message)s")
+    formatter = logging.Formatter(
+        "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+    )
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
@@ -27,13 +38,13 @@ class LessonPlanResponse(BaseModel):
     plan: LessonPlan
 
     class Config:
-        from_attributes = True
+        from_attributes = True  #
 
 
 # -------------------------
 # Helper: summarize fallbacks and enrichments
 # -------------------------
-def summarize_fallbacks(weeks) -> dict:
+def summarize_fallbacks(weeks) -> dict:  #
     fallback_count = 0
     enrichment_count = 0
 
@@ -54,24 +65,30 @@ def summarize_fallbacks(weeks) -> dict:
 # -------------------------
 # Protected Endpoint
 # -------------------------
-@router.post("/lesson-plan", response_model=LessonPlanResponse, summary="Generate AI-powered lesson plan")
+@router.post(
+    "/lesson-plan",
+    response_model=LessonPlanResponse,
+    summary="Generate AI-powered lesson plan",
+    # --- 2. ADD THE DEPENDENCY ---
+    dependencies=[Depends(check_lesson_plan_limit)],
+)
 async def create_lesson_plan(
-    req: LessonPlanRequest, username: str = Depends(get_current_user)
+    req: LessonPlanRequest,
+    # --- 3. UPDATE THE FUNCTION SIGNATURE ---
+    user: User = Depends(get_current_db_user),  # Get the full User object
+    db: Session = Depends(get_db),  # Get the DB session
 ):
     """
     Generate a complete lesson plan for a subject, class, and term.
-    Requires:
-    - JWT authentication
-    - Subject, class_level, term, resumption_date, topics, etc.
     """
 
     try:
         # Handle comma-separated topics from frontend
-        if isinstance(req.topics, str):
+        if isinstance(req.topics, str):  #
             req.topics = [t.strip() for t in req.topics.split(",") if t.strip()]
 
         # Limit topics to duration weeks
-        req.topics = req.topics[:req.duration_weeks or 10]
+        req.topics = req.topics[: req.duration_weeks or 10]
         duration_weeks = min(req.duration_weeks or 10, 12)
 
         # Generate the lesson plan via AI
@@ -87,14 +104,23 @@ async def create_lesson_plan(
             topics=req.topics,
         )
 
+        # --- 4. CRITICAL: INCREMENT THE COUNT ---
+        if user.subscription_tier == SubscriptionTier.FREE:
+            # user.usage is the UsageLimits object
+            user.usage.lesson_notes_generated += 1
+            db.commit()
+        # ----------------------------------------
+
         # Log generation details
         summary = summarize_fallbacks(plan.weeks)
         logger.info(
-            f"Lesson plan generated for {req.subject} ({req.class_level}) by {username}. Summary: {summary}"
+            f"Lesson plan generated for {req.subject} ({req.class_level}) by {user.username}. Summary: {summary}"
         )
 
         return LessonPlanResponse(plan=plan)
 
     except Exception as e:
         logger.exception("Failed to generate lesson plan")
-        raise HTTPException(status_code=500, detail=f"Lesson plan generation failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Lesson plan generation failed: {str(e)}"
+        )
