@@ -2,12 +2,23 @@
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import List
+from typing import List, Union
+from datetime import date
 import logging
-from app.services.ai_lesson_plan_generator import generate_lesson_plan
-from app.models.lesson_plan_model import LessonPlan, LessonPlanRequest
 
-# --- 1. IMPORTS TO ADD/CHANGE ---
+# --- IMPORT MODELS AND THE GENERATOR FUNCTION ---
+from app.services.ai_lesson_plan_generator import (
+    generate_lesson_plan,
+    _generate_week_entry,
+    GenerationMetrics,
+)
+from app.models.lesson_plan_model import (
+    LessonPlan,
+    LessonPlanRequest,
+    LessonWeek,
+    WeekGenerationError,
+)
+
 from sqlalchemy.orm import Session
 from app.models.users import User
 from app.subscription_model import SubscriptionTier
@@ -44,21 +55,25 @@ class LessonPlanResponse(BaseModel):
 # -------------------------
 # Helper: summarize fallbacks and enrichments
 # -------------------------
-def summarize_fallbacks(weeks) -> dict:  #
-    fallback_count = 0
+def summarize_failures(weeks) -> dict:  # Renamed for clarity
+    failed_count = 0
     enrichment_count = 0
 
     for w in weeks:
-        if getattr(w, "_fallback_used", False):
-            fallback_count += 1
-        elif "Enrichment / consolidation" in (getattr(w, "topic", "") or ""):
+        if w.status == "failed":  # <-- UPDATED LOGIC
+            failed_count += 1
+        # Check for success before accessing topic
+        elif w.status == "success" and "Enrichment / consolidation" in (
+            getattr(w, "topic", "") or ""
+        ):
             enrichment_count += 1
 
+    ai_generated_weeks = len(weeks) - failed_count - enrichment_count
     return {
         "total_weeks": len(weeks),
-        "fallback_weeks": fallback_count,
+        "failed_weeks": failed_count,  # <-- Renamed
         "enrichment_weeks": enrichment_count,
-        "ai_generated_weeks": len(weeks) - fallback_count - enrichment_count,
+        "ai_generated_weeks": ai_generated_weeks,
     }
 
 
@@ -112,7 +127,7 @@ async def create_lesson_plan(
         # ----------------------------------------
 
         # Log generation details
-        summary = summarize_fallbacks(plan.weeks)
+        summary = summarize_failures(plan.weeks)
         logger.info(
             f"Lesson plan generated for {req.subject} ({req.class_level}) by {user.username}. Summary: {summary}"
         )
@@ -123,4 +138,78 @@ async def create_lesson_plan(
         logger.exception("Failed to generate lesson plan")
         raise HTTPException(
             status_code=500, detail=f"Lesson plan generation failed: {str(e)}"
+        )
+
+
+# -------------------------
+# --- 5. NEW ENDPOINT FOR RETRYING A SINGLE WEEK ---
+# -------------------------
+class RetryWeekRequest(BaseModel):
+    """The data needed to retry a single week's generation."""
+
+    subject: str
+    class_level: str
+    term: str
+    week_number: int
+    start_date: date
+    end_date: date
+    topic: str
+
+
+class DummyMetrics:
+    """A dummy metrics object for single retries."""
+
+    def record_success(self):
+        logger.info("Retry week succeeded.")
+
+    def record_failure(self):
+        logger.warning("Retry week failed.")
+
+
+@router.post(
+    "/lesson-plan/retry-week",
+    response_model=Union[LessonWeek, WeekGenerationError],
+    summary="Retry a single failed lesson week",
+)
+async def retry_lesson_week(
+    request: RetryWeekRequest,
+    user: User = Depends(get_current_db_user),  # <-- SECURED: User must be logged in
+):
+    """
+    Retries the generation for a single failed week.
+    This endpoint does NOT count against the user's generation quota.
+    """
+    logger.info(
+        f"User {user.username} retrying week {request.week_number} ('{request.topic}')"
+    )
+
+    try:
+        # Prepare arguments for the generator function
+        week_meta = {"start_date": request.start_date, "end_date": request.end_date}
+        dummy_metrics = DummyMetrics()
+
+        # Call the single-week generator directly.
+        # The @retry_on_ai_error decorator is still active on it.
+        result = await _generate_week_entry(
+            week_idx=request.week_number,
+            week_meta=week_meta,
+            topic=request.topic,
+            subject=request.subject,
+            class_level=request.class_level,
+            term=request.term,
+            metrics=dummy_metrics,
+        )
+
+        # Return the result, which will be either a
+        # LessonWeek (status: "success") or
+        # WeekGenerationError (status: "failed")
+        return result
+
+    except Exception as e:
+        logger.exception(
+            f"Error in retry_lesson_week endpoint for topic: {request.topic}"
+        )
+        # Return a standard error response if the endpoint itself fails
+        raise HTTPException(
+            status_code=500, detail=f"Failed to retry week generation: {str(e)}"
         )

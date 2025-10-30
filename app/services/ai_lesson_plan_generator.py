@@ -9,7 +9,12 @@ from functools import lru_cache
 from typing import List, Optional, Callable
 from asyncio import Semaphore
 
-from app.models.lesson_plan_model import LessonActivity, LessonPlan, LessonWeek
+from app.models.lesson_plan_model import (
+    LessonActivity,
+    LessonPlan,
+    LessonWeek,
+    WeekGenerationError,
+)
 from app.services.ministry_data_service import ministry_service
 from app.utils.ai_client import AIClientError, call_ai_model
 from app.utils.date_utils import generate_weeks
@@ -49,7 +54,9 @@ class LessonPlanRequest(BaseModel):
     class_level: str
     term: str
     resumption_date: date
-    duration_weeks: int = Field(default=config.max_duration_weeks, le=config.max_duration_weeks, ge=1)
+    duration_weeks: int = Field(
+        default=config.max_duration_weeks, le=config.max_duration_weeks, ge=1
+    )
     topics: Optional[List[str]] = None
     state: Optional[str] = None
     lga: Optional[str] = None
@@ -63,10 +70,18 @@ class LessonPlanRequest(BaseModel):
     @validator("class_level")
     def validate_class_level(cls, v):
         valid_levels = {
-            "Basic 1 (Pry 1)", "Basic 2 (Pry 2)", "Basic 3 (Pry 3)",
-            "Basic 4 (Pry 4)", "Basic 5 (Pry 5)", "Basic 6 (Pry 6)",
-            "Basic 7 (Jss 1)", "Basic 8 (Jss 2)", "Basic 9 (Jss 3)",
-            "Ss1", "Ss2", "Ss3"
+            "Basic 1 (Pry 1)",
+            "Basic 2 (Pry 2)",
+            "Basic 3 (Pry 3)",
+            "Basic 4 (Pry 4)",
+            "Basic 5 (Pry 5)",
+            "Basic 6 (Pry 6)",
+            "Basic 7 (Jss 1)",
+            "Basic 8 (Jss 2)",
+            "Basic 9 (Jss 3)",
+            "Ss1",
+            "Ss2",
+            "Ss3",
         }
         if v.title() not in valid_levels:
             raise ValueError(f"Class level must be one of {valid_levels}")
@@ -103,14 +118,18 @@ class CachedMinistryService:
         self._cache = {}
         self._locks = {}
 
-    async def get_ministry_scheme(self, subject: str, class_level: str, term: str, state: Optional[str] = None):
+    async def get_ministry_scheme(
+        self, subject: str, class_level: str, term: str, state: Optional[str] = None
+    ):
         cache_key = f"{subject}_{class_level}_{term}_{state}"
         if cache_key not in self._cache:
             if cache_key not in self._locks:
                 self._locks[cache_key] = asyncio.Lock()
             async with self._locks[cache_key]:
                 if cache_key not in self._cache:
-                    scheme = await ministry_service.get_ministry_scheme(subject, class_level, term, state)
+                    scheme = await ministry_service.get_ministry_scheme(
+                        subject, class_level, term, state
+                    )
                     self._cache[cache_key] = scheme
         return self._cache[cache_key]
 
@@ -133,7 +152,7 @@ class GenerationMetrics:
     def __init__(self):
         self.start_time = None
         self.successful_weeks = 0
-        self.fallback_weeks = 0
+        self.failed_weeks = 0  # <-- Renamed from fallback_weeks
 
     def start(self):
         self.start_time = time.time()
@@ -141,8 +160,8 @@ class GenerationMetrics:
     def record_success(self):
         self.successful_weeks += 1
 
-    def record_fallback(self):
-        self.fallback_weeks += 1
+    def record_failure(self):  # <-- Renamed from record_fallback
+        self.failed_weeks += 1
 
     def get_metrics(self, total_weeks: int) -> dict:
         duration = (time.time() - self.start_time) if self.start_time else 0
@@ -150,8 +169,8 @@ class GenerationMetrics:
         return {
             "generation_time_seconds": round(duration, 2),
             "successful_weeks": self.successful_weeks,
-            "fallback_weeks": self.fallback_weeks,
-            "success_rate": f"{success_rate:.1f}%"
+            "failed_weeks": self.failed_weeks,  # <-- Renamed
+            "success_rate": f"{success_rate:.1f}%",
         }
 
 
@@ -165,27 +184,43 @@ def retry_on_ai_error(max_retries: int = config.max_retries):
             week_idx = args[0]
             week_meta = args[1]
             topic = args[2]
-            metrics = kwargs.get('metrics') or args[6]
+            metrics = kwargs.get("metrics") or args[6]
 
             last_exception = None
             for attempt in range(max_retries + 1):
                 try:
+                    # Attempt to run the AI generation
                     return await func(*args, **kwargs)
                 except (AIClientError, ValidationError, json.JSONDecodeError) as e:
                     last_exception = e
-                    wait = 2 ** attempt
-                    logger.warning(f"Attempt {attempt+1}/{max_retries+1} for week {week_idx} ('{topic}') failed: {e}. Retrying in {wait}s...")
+                    wait = 2**attempt
+                    logger.warning(
+                        f"Attempt {attempt + 1}/{max_retries + 1} for week {week_idx} ('{topic}') failed: {e}. Retrying in {wait}s..."
+                    )
                     await asyncio.sleep(wait)
 
-            logger.error(f"All retries failed for week {week_idx} ('{topic}'). Using fallback. Last error: {last_exception}")
-            skeleton = _safe_skeleton_for_topic(topic)
-            fallback_payload = {**week_meta, "week_number": week_idx, "topic": topic, **skeleton}
-            week_obj = LessonWeek.model_validate(fallback_payload)
-            week_obj._fallback_used = True
-            metrics.record_fallback()
-            return week_obj
+            # --- ALL RETRIES FAILED ---
+            # Instead of a skeleton, return a WeekGenerationError object.
+            logger.error(
+                f"All retries failed for week {week_idx} ('{topic}'). Returning error object. Last error: {last_exception}"
+            )
+
+            metrics.record_failure()  # <-- Use renamed method
+
+            # This is NOT an exception. It's a valid return object
+            # that asyncio.gather will collect.
+            return WeekGenerationError(
+                week_number=week_idx,
+                topic=topic,
+                error_message=f"Failed after {max_retries} retries: {str(last_exception)}",
+                start_date=week_meta["start_date"],
+                end_date=week_meta["end_date"],
+            )
+
         return wrapper
+
     return decorator
+
 
 # -------------------------
 # NEW: Text Cleanup Utility
@@ -195,13 +230,14 @@ def _cleanup_ai_text(text: str) -> str:
     if not isinstance(text, str):
         return text
     # Remove bolding (**) and italics (*)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = re.sub(r"\*\*(.*?)\*\*", r"\1", text)
+    text = re.sub(r"\*(.*?)\*", r"\1", text)
     # Remove markdown headings (###, ##, #)
-    text = re.sub(r'#+\s*', '', text)
+    text = re.sub(r"#+\s*", "", text)
     # Standardize list-like lines into simple paragraphs
-    text = re.sub(r'^\s*[-*]\s+', '', text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*[-*]\s+", "", text, flags=re.MULTILINE)
     return text.strip()
+
 
 # -------------------------
 # Prompt & Fallback Builder
@@ -259,38 +295,40 @@ Return strictly valid JSON using this structure:
 """
 
 
-def _safe_skeleton_for_topic(topic: str) -> dict:
-    # ... (This function remains unchanged)
-    return {
-        "subtopic": None,
-        "objectives": [
-            f"Define and explain {topic}.",
-            f"List examples of {topic} in everyday life."
-        ],
-        "instructional_materials": ["Textbook", "Board", "Marker"],
-        "prerequisite_knowledge": f"Basic knowledge of previous lessons on {topic}.",
-        "activities": {
-            "introduction": f"Introduce {topic} through relatable classroom examples.",
-            "explanation": f"Explain the meaning, uses, and examples of {topic} clearly.",
-            "guided_practice": f"Guide students to identify examples of {topic} in their environment.",
-            "independent_practice": f"Students write or discuss how {topic} applies to their daily life.",
-            "practical": f"Students demonstrate or simulate real-life examples of {topic}.",
-        },
-        "assessment": f"1. What is {topic}? 2. Mention examples of {topic}. 3. State two uses of {topic}.",
-        "assignment": f"Write short notes on {topic}. Include examples and applications.",
-        "summary": f"This lesson covers the meaning, importance, and real-life applications of {topic}. Students should study the definitions, examples, and uses for exam preparation.",
-        "possible_difficulties": f"Some students may confuse {topic} with related concepts.",
-        "remarks": f"Use visuals or demonstrations to clarify {topic}.",
-        "period": "Single",
-        "duration_minutes": 40,
-    }
+# def _safe_skeleton_for_topic(topic: str) -> dict:
+#     # ... (This function remains unchanged)
+#     return {
+#         "subtopic": None,
+#         "objectives": [
+#             f"Define and explain {topic}.",
+#             f"List examples of {topic} in everyday life.",
+#         ],
+#         "instructional_materials": ["Textbook", "Board", "Marker"],
+#         "prerequisite_knowledge": f"Basic knowledge of previous lessons on {topic}.",
+#         "activities": {
+#             "introduction": f"Introduce {topic} through relatable classroom examples.",
+#             "explanation": f"Explain the meaning, uses, and examples of {topic} clearly.",
+#             "guided_practice": f"Guide students to identify examples of {topic} in their environment.",
+#             "independent_practice": f"Students write or discuss how {topic} applies to their daily life.",
+#             "practical": f"Students demonstrate or simulate real-life examples of {topic}.",
+#         },
+#         "assessment": f"1. What is {topic}? 2. Mention examples of {topic}. 3. State two uses of {topic}.",
+#         "assignment": f"Write short notes on {topic}. Include examples and applications.",
+#         "summary": f"This lesson covers the meaning, importance, and real-life applications of {topic}. Students should study the definitions, examples, and uses for exam preparation.",
+#         "possible_difficulties": f"Some students may confuse {topic} with related concepts.",
+#         "remarks": f"Use visuals or demonstrations to clarify {topic}.",
+#         "period": "Single",
+#         "duration_minutes": 40,
+#     }
 
 
 # -------------------------
 # Main AI Generation Logic
 # -------------------------
 @retry_on_ai_error(max_retries=config.max_retries)
-async def _generate_week_entry(week_idx, week_meta, topic, subject, class_level, term, metrics):
+async def _generate_week_entry(
+    week_idx, week_meta, topic, subject, class_level, term, metrics
+):
     prompt = _build_enhanced_prompt(subject, class_level, term, week_idx, topic)
 
     def stringify(value):
@@ -326,11 +364,25 @@ async def _generate_week_entry(week_idx, week_meta, topic, subject, class_level,
     raw_activities = parsed.get("activities") or {}
     # --- MODIFIED: Apply cleanup to each activity description ---
     activities = {
-        "introduction": _cleanup_ai_text(raw_activities.get("introduction") or f"Introduce {topic} and engage students."),
-        "explanation": _cleanup_ai_text(raw_activities.get("explanation") or f"Explain {topic} using examples."),
-        "guided_practice": _cleanup_ai_text(raw_activities.get("guided_practice") or f"Guide students through {topic} exercises."),
-        "independent_practice": _cleanup_ai_text(raw_activities.get("independent_practice") or f"Students practice {topic} individually."),
-        "practical": _cleanup_ai_text(raw_activities.get("practical") or f"Demonstrate practical applications of {topic}."),
+        "introduction": _cleanup_ai_text(
+            raw_activities.get("introduction")
+            or f"Introduce {topic} and engage students."
+        ),
+        "explanation": _cleanup_ai_text(
+            raw_activities.get("explanation") or f"Explain {topic} using examples."
+        ),
+        "guided_practice": _cleanup_ai_text(
+            raw_activities.get("guided_practice")
+            or f"Guide students through {topic} exercises."
+        ),
+        "independent_practice": _cleanup_ai_text(
+            raw_activities.get("independent_practice")
+            or f"Students practice {topic} individually."
+        ),
+        "practical": _cleanup_ai_text(
+            raw_activities.get("practical")
+            or f"Demonstrate practical applications of {topic}."
+        ),
     }
 
     week_payload = {
@@ -340,14 +392,25 @@ async def _generate_week_entry(week_idx, week_meta, topic, subject, class_level,
         "topic": topic,
         # --- MODIFIED: Apply cleanup to all relevant text fields ---
         "subtopic": _cleanup_ai_text(parsed.get("subtopic")),
-        "objectives": [_cleanup_ai_text(obj) for obj in parsed.get("objectives", [])] or [f"Explain {topic}."],
-        "instructional_materials": [_cleanup_ai_text(mat) for mat in parsed.get("instructional_materials", [])] or ["Textbook", "Board"],
-        "prerequisite_knowledge": _cleanup_ai_text(parsed.get("prerequisite_knowledge") or ""),
+        "objectives": [_cleanup_ai_text(obj) for obj in parsed.get("objectives", [])]
+        or [f"Explain {topic}."],
+        "instructional_materials": [
+            _cleanup_ai_text(mat) for mat in parsed.get("instructional_materials", [])
+        ]
+        or ["Textbook", "Board"],
+        "prerequisite_knowledge": _cleanup_ai_text(
+            parsed.get("prerequisite_knowledge") or ""
+        ),
         "activities": activities,
         "assessment": stringify(parsed.get("assessment")),
         "assignment": stringify(parsed.get("assignment")),
-        "summary": _cleanup_ai_text(parsed.get("summary") or f"Study notes on {topic}, including meaning, examples, and uses."),
-        "possible_difficulties": _cleanup_ai_text(parsed.get("possible_difficulties") or ""),
+        "summary": _cleanup_ai_text(
+            parsed.get("summary")
+            or f"Study notes on {topic}, including meaning, examples, and uses."
+        ),
+        "possible_difficulties": _cleanup_ai_text(
+            parsed.get("possible_difficulties") or ""
+        ),
         "remarks": _cleanup_ai_text(parsed.get("remarks") or ""),
         "period": _cleanup_ai_text(parsed.get("period") or "Single"),
         "duration_minutes": parsed.get("duration_minutes") or 40,
@@ -357,6 +420,7 @@ async def _generate_week_entry(week_idx, week_meta, topic, subject, class_level,
     metrics.record_success()
     return week_obj
 
+
 # def _build_enhanced_prompt(subject, class_level, term, week_number, topic):
 #     return f"""
 # You are an experienced Nigerian teacher creating a *complete, exam-ready lesson plan* for students.
@@ -365,10 +429,10 @@ async def _generate_week_entry(week_idx, week_meta, topic, subject, class_level,
 # Return **only a valid JSON object**—no explanations, commentary, or markdown.
 
 # Each section must be richly detailed and original, suitable for classroom delivery.
-# The "summary" field should contain **at least 1000 words** of well-organized, exam-focused lesson notes written in clear, student-friendly English. 
+# The "summary" field should contain **at least 1000 words** of well-organized, exam-focused lesson notes written in clear, student-friendly English.
 # It should read like a full reference note a teacher gives students to study for tests or exams, covering definitions, explanations, examples, and applications.
 
-# The "activities" section must describe real classroom engagement — teacher–student dialogue, demonstrations, and examples. 
+# The "activities" section must describe real classroom engagement — teacher–student dialogue, demonstrations, and examples.
 # The "assessment" section must provide exam-style questions aligned with the topic, and "assignment" must specify homework or projects that reinforce the learning objectives.
 
 # Generate the JSON for:
@@ -510,12 +574,19 @@ async def _generate_week_entry(week_idx, week_meta, topic, subject, class_level,
 # Full Lesson Plan Generator
 # -------------------------
 async def generate_lesson_plan(
-    *, school_name, state, lga, subject, class_level, term,
-    resumption_date, duration_weeks=config.max_duration_weeks,
-    topics=None, concurrency=config.max_concurrency,
+    *,
+    school_name,
+    state,
+    lga,
+    subject,
+    class_level,
+    term,
+    resumption_date,
+    duration_weeks=config.max_duration_weeks,
+    topics=None,
+    concurrency=config.max_concurrency,
     progress_callback: Optional[Callable[[int, int], None]] = None,
 ) -> LessonPlan:
-
     request = LessonPlanRequest(
         school_name=school_name,
         subject=subject,
@@ -533,14 +604,18 @@ async def generate_lesson_plan(
     subject = request.subject
     class_level = request.class_level
 
-    logger.info(f"Generating {duration_weeks}-week lesson plan for {subject} {class_level}")
+    logger.info(
+        f"Generating {duration_weeks}-week lesson plan for {subject} {class_level}"
+    )
 
     metrics = GenerationMetrics()
     metrics.start()
     weeks_meta = generate_weeks(resumption_date, duration_weeks)
 
     if not topics:
-        scheme = await cached_ministry_service.get_ministry_scheme(subject, class_level, term, state)
+        scheme = await cached_ministry_service.get_ministry_scheme(
+            subject, class_level, term, state
+        )
         topics = scheme.topics[:duration_weeks]
     elif len(topics) < duration_weeks:
         pad = duration_weeks - len(topics)
@@ -551,12 +626,16 @@ async def generate_lesson_plan(
 
     async def gen_wrapper(idx, meta, topic):
         async with rate_limiter, semaphore:
-            result = await _generate_week_entry(idx, meta, topic, subject, class_level, term, metrics=metrics)
+            result = await _generate_week_entry(
+                idx, meta, topic, subject, class_level, term, metrics=metrics
+            )
             if progress_callback:
                 progress_callback(idx, duration_weeks)
             return result
 
-    tasks = [gen_wrapper(i + 1, weeks_meta[i], topics[i]) for i in range(duration_weeks)]
+    tasks = [
+        gen_wrapper(i + 1, weeks_meta[i], topics[i]) for i in range(duration_weeks)
+    ]
     lesson_weeks = await asyncio.gather(*tasks)
 
     academic_session = f"{resumption_date.year}/{resumption_date.year + 1}"
@@ -574,5 +653,7 @@ async def generate_lesson_plan(
         weeks=lesson_weeks,
     )
 
-    logger.info(f"Lesson plan completed successfully with metrics: {metrics.get_metrics(duration_weeks)}")
+    logger.info(
+        f"Lesson plan completed successfully with metrics: {metrics.get_metrics(duration_weeks)}"
+    )
     return plan

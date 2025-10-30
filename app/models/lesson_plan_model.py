@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Union, Literal
 from pydantic import BaseModel, Field
 from datetime import date
 
@@ -12,6 +12,8 @@ class LessonActivity(BaseModel):
 
 
 class LessonWeek(BaseModel):
+    status: Literal["success"] = "success"
+
     week_number: int
     start_date: date
     end_date: date
@@ -45,6 +47,16 @@ class LessonWeek(BaseModel):
         validate_by_name = True
 
 
+#  NEW MODEL TO REPRESENT FAILURE ---
+class WeekGenerationError(BaseModel):
+    status: Literal["failed"] = "failed"
+    week_number: int
+    topic: str
+    error_message: str
+    start_date: date
+    end_date: date
+
+
 class LessonPlan(BaseModel):
     school_name: str
     state: str
@@ -55,7 +67,9 @@ class LessonPlan(BaseModel):
     academic_session: Optional[str] = None  # e.g., "2025/2026"
     resumption_date: date
     duration_weeks: int = 10  # typically capped at 10 weeks
-    weeks: List[LessonWeek]
+
+    # --- UPDATED WEEKS LIST TO ALLOW FOR ERRORS ---
+    weeks: List[Union[LessonWeek, WeekGenerationError]]
 
 
 class LessonPlanRequest(BaseModel):
