@@ -16,7 +16,7 @@ COPY pyproject.toml ./
 # Install all dependencies from your [project.dependencies]
 # and [project.optional-dependencies] using uv.
 # This is the replacement for "pip install -r requirements.txt"
-RUN uv pip sync
+RUN uv pip sync pyproject.toml
 
 # --- Copy Application Code ---
 # Now that dependencies are installed, copy the rest of your app's code
