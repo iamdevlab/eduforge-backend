@@ -4,6 +4,10 @@ FROM python:3.14-slim
 # Set the working directory inside the container
 WORKDIR /code
 
+# Add the /code directory to Python's import path.
+# This allows Gunicorn to find your 'app' module.
+ENV PYTHONPATH /code
+
 # --- Install uv ---
 # Install uv itself using pip. We'll use this to install our app's dependencies.
 RUN pip install uv
@@ -16,7 +20,8 @@ COPY pyproject.toml ./
 # Install all dependencies from your [project.dependencies]
 # and [project.optional-dependencies] using uv.
 # This is the replacement for "pip install -r requirements.txt"
-RUN uv pip sync pyproject.toml
+RUN uv pip sync --system pyproject.toml
+
 
 # --- Copy Application Code ---
 # Now that dependencies are installed, copy the rest of your app's code
@@ -29,4 +34,4 @@ COPY . /code/
 # variable that Google Cloud Run provides automatically.
 # We are starting with 1 worker to save memory, which should
 # fix the crashes you had on Heroku.
-CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 -k uvicorn.workers.UvicornWorker main:app
+CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 -k uvicorn.workers.UvicornWorker app.main:app
