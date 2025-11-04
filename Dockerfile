@@ -4,6 +4,15 @@ FROM python:3.14-slim
 # Set the working directory inside the container
 WORKDIR /code
 
+# These are necessary for the psycopg2-binary package to function properly.
+# If you don't need PostgreSQL support, you can remove this step.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    # Clean up the package lists to keep the image small
+    && rm -rf /var/lib/apt/lists/*
+
 # Add the /code directory to Python's import path.
 # This allows Gunicorn to find your 'app' module.
 ENV PYTHONPATH /code
