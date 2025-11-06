@@ -47,8 +47,4 @@ jobs:
 
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy $SERVICE_NAME \
-            --image $IMAGE \
-            --region $REGION \
-            --platform managed \
-            --allow-unauthenticated
+          gcloud run deploy $SERVICE_NAME --image $IMAGE --region $REGION --platform managed --allow-unauthenticated
