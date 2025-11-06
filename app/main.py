@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- ADD THESE IMPORTS ---
+
 # Import your database engine, Base, and your User model
 # I'm using the path 'app.services.database' from your users.py file
 from app.services.database import engine, Base
