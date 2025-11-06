@@ -1,0 +1,54 @@
+name: Deploy EduForge Backend to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  PROJECT_ID: eduforge-backend-477410
+  REGION: us-central1
+  SERVICE_NAME: eduforge-backend
+  IMAGE: us-central1-docker.pkg.dev/eduforge-backend-477410/eduforge-repo/eduforge-backend
+
+jobs:
+  deploy:
+    name: Build and Deploy to Cloud Run
+    runs-on: ubuntu-latest
+
+    # Permissions required for Workload Identity Federation
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          token_format: access_token
+          workload_identity_provider: "projects/181749081267/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
+          service_account: "gha-deployer@eduforge-backend-477410.iam.gserviceaccount.com"
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Configure Docker authentication
+        run: gcloud auth configure-docker ${REGION}-docker.pkg.dev --quiet
+
+      - name: Build and push image to Artifact Registry
+        run: |
+          gcloud builds submit --tag $IMAGE .
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy $SERVICE_NAME \
+            --image $IMAGE \
+            --region $REGION \
+            --platform managed \
+            --allow-unauthenticated
