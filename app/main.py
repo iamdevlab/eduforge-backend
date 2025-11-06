@@ -27,6 +27,7 @@ origins = [
     "http://127.0.0.1:5173",
     "https://www.eduforgeplanner.com",
     "https://eduforgeplanner.com",
+    "https://api.eduforgeplanner.com",
 ]
 app.add_middleware(
     CORSMiddleware,
