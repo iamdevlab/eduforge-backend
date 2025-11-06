@@ -17,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
 
     # Permissions required for Workload Identity Federation
+    # Git Flow Actions to access Google Cloud resources
     permissions:
       id-token: write
       contents: read
