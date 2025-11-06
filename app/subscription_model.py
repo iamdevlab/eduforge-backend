@@ -6,7 +6,7 @@ from sqlalchemy.orm import relationship
 from app.services.database import Base  # Import Base from your database.py file
 
 
-# 1. Define an Enum for the subscription tiers
+#
 class SubscriptionTier(enum.Enum):
     """Enumeration for subscription tiers."""
 
