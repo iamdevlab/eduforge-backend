@@ -1,46 +1,27 @@
 # Start from an official, lightweight Python image
-FROM python:3.14-slim
+FROM python:3.12-slim
 
 # Set the working directory inside the container
 WORKDIR /code
 
-# These are necessary for the psycopg2-binary package to function properly.
-# If you don't need PostgreSQL support, you can remove this step.
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+# Install system dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
-    # Clean up the package lists to keep the image small
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Add the /code directory to Python's import path.
-# This allows Gunicorn to find your 'app' module.
-ENV PYTHONPATH /code
+# Add the /code directory to Python's import path
+ENV PYTHONPATH=/code
 
-# --- Install uv ---
-# Install uv itself using pip. We'll use this to install our app's dependencies.
-RUN pip install uv
+# Copy and install Python dependencies first for better caching
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# --- Install Dependencies ---
-# Copy ONLY the project file. This is a key optimization.
-# Docker caches this step and will only re-run it if pyproject.toml changes.
-COPY pyproject.toml ./
+# Copy application code
+COPY . .
 
-# Install all dependencies from your [project.dependencies]
-# and [project.optional-dependencies] using uv.
-# This is the replacement for "pip install -r requirements.txt"
-RUN uv pip sync --system pyproject.toml
+EXPOSE 8080
 
-
-# --- Copy Application Code ---
-# Now that dependencies are installed, copy the rest of your app's code
-# (your 'app' folder, 'main.py', etc.)
-COPY . /code/
-
-# --- Run the Application ---
-# This is the command to start your app.
-# It's the same as the Heroku command, but we use the $PORT
-# variable that Google Cloud Run provides automatically.
-# We are starting with 1 worker to save memory, which should
-# fix the crashes you had on Heroku.
-CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 -k uvicorn.workers.UvicornWorker app.main:app
+# Start app using Gunicorn with Uvicorn workers
+CMD exec gunicorn -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --log-level debug
